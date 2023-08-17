@@ -1,0 +1,53 @@
+﻿
+@*
+    For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+*@
+@{
+}
+
+<link href="~/lib/datatables/css/dataTables.bootstrap4.css" rel="stylesheet" />
+
+<hr />
+<div>
+    <div class="menu-content px-3 py-3 d-flex justify-content-between">
+        <h1 style="font-size: 38px;" class="text-primary">Products</h1>
+        <a id="exportButton" class="btn btn-primary btn-sm px-4" style="padding: 10px 20px; font-size: 18px;">Export To Excel File</a>
+    </div>
+</div>
+<hr />
+
+
+
+
+<div class="container">
+
+    <table id="products" class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Band</th>
+                <th>Category Code</th>
+                <th>Manufacturer</th>
+                <th>Part SKU</th>
+                <th>Item Description</th>
+                <th>List Price</th>
+                <th>Minimum Discount</th>
+                <th>Discounted Price</th>
+            </tr>
+        </thead>
+    </table>
+
+</div>
+
+
+
+
+@section Scripts
+    {
+    <script src="~/lib/datatables/js/jquery.dataTables.js"></script>
+    <script src="~/lib/datatables/js/dataTables.bootstrap4.js"></script>
+    <script src="~/js/productsDatatable.js"></script>
+
+}
+
+
