@@ -12,7 +12,7 @@ namespace DealWithExcelFiles.Controllers
     {
         private readonly ApplicationDBContext _dBContext;
 
-        public ProductController(ApplicationDBContext dBContext)
+        public ProductController(ApplicationDBContext dBContext) 
         {
             _dBContext = dBContext;
         }

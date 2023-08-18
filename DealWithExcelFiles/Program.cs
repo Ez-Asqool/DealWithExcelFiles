@@ -1,4 +1,5 @@
 using DealWithExcelFiles.Data;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +9,18 @@ builder.Services.AddControllersWithViews();
 
 builder.Services.AddDbContext<ApplicationDBContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+//builder.Services.Configure<FormOptions>(options =>
+//{
+//    options.MultipartBodyLengthLimit = 104857600; // 100 MB in bytes
+//});
+
+builder.WebHost.ConfigureKestrel((context, options) =>
+{
+    // Apply Kestrel configuration from appsettings.json
+    options.Limits.MaxRequestBodySize = 104857600; // 100 MB in bytes
+});
+
 
 var app = builder.Build();
 

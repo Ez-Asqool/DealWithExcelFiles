@@ -134,6 +134,7 @@ namespace DealWithExcelFiles.Controllers
         //                    {
         //                        _dbContext.Products.AddRange(products.Skip(i).Take(batchSize));
         //                        await _dbContext.SaveChangesAsync();
+
         //                    }
         //                }
         //            }
@@ -145,6 +146,76 @@ namespace DealWithExcelFiles.Controllers
         //    return View(model);
         //}
 
+        //[HttpPost]
+        //public async Task<IActionResult> Upload(FileUploadViewModel model)
+        //{
+        //    if (ModelState.IsValid)
+        //    {
+        //        using (var memoryStream = new MemoryStream())
+        //        {
+        //            await model.ExcelFile.CopyToAsync(memoryStream);
+        //            using (var package = new ExcelPackage(memoryStream))
+        //            {
+        //                var worksheets = package.Workbook.Worksheets;
+
+        //                foreach (var worksheet in worksheets)
+        //                {
+        //                    for (int row = 3; row <= worksheet.Dimension.End.Row; row++)
+        //                    {
+        //                        var sku = worksheet.Cells[row, 5].Text;
+
+        //                        // Skip rows with empty SKU (you can add more checks if needed)
+        //                        if (string.IsNullOrWhiteSpace(sku))
+        //                        {
+        //                            continue;
+        //                        }
+
+        //                        var existingProduct = _dbContext.Products.FirstOrDefault(p => p.PartSKU == sku);
+
+        //                        if (existingProduct == null)
+        //                        {
+        //                            // Insert new product if SKU doesn't exist
+        //                            var product = new Product
+        //                            {
+        //                                Band = int.Parse(worksheet.Cells[row, 2].Text),
+        //                                CategoryCode = worksheet.Cells[row, 3].Text,
+        //                                Manufacturer = worksheet.Cells[row, 4].Text,
+        //                                PartSKU = sku,
+        //                                ItemDescription = worksheet.Cells[row, 6].Text,
+        //                                ListPrice = worksheet.Cells[row, 7].Text,
+        //                                MinimumDiscount = worksheet.Cells[row, 8].Text,
+        //                                DiscountedPrice = worksheet.Cells[row, 9].Text
+        //                            };
+
+        //                            _dbContext.Products.Add(product);
+        //                        }
+        //                        else
+        //                        {
+        //                            // Update existing product if SKU exists
+        //                            existingProduct.Band = int.Parse(worksheet.Cells[row, 2].Text);
+        //                            existingProduct.CategoryCode = worksheet.Cells[row, 3].Text;
+        //                            existingProduct.Manufacturer = worksheet.Cells[row, 4].Text;
+        //                            existingProduct.ItemDescription = worksheet.Cells[row, 6].Text;
+        //                            existingProduct.ListPrice = worksheet.Cells[row, 7].Text;
+        //                            existingProduct.MinimumDiscount = worksheet.Cells[row, 8].Text;
+        //                            existingProduct.DiscountedPrice = worksheet.Cells[row, 9].Text;
+
+        //                            _dbContext.Products.Update(existingProduct);
+        //                        }
+        //                    }
+
+        //                    await _dbContext.SaveChangesAsync();
+        //                }
+        //            }
+        //        }
+
+        //        return RedirectToAction("Success");
+        //    }
+
+        //    return View(model);
+        //}
+
+
         [HttpPost]
         public async Task<IActionResult> Upload(FileUploadViewModel model)
         {
@@ -155,10 +226,17 @@ namespace DealWithExcelFiles.Controllers
                     await model.ExcelFile.CopyToAsync(memoryStream);
                     using (var package = new ExcelPackage(memoryStream))
                     {
+                        //int totalRowCount = 0;
+
                         var worksheets = package.Workbook.Worksheets;
 
                         foreach (var worksheet in worksheets)
                         {
+                            //totalRowCount += worksheet.Dimension.End.Row - 2; // Exclude header rows
+
+                            var batch = new List<Product>();
+                            int countEmptyRows = 0;
+
                             for (int row = 3; row <= worksheet.Dimension.End.Row; row++)
                             {
                                 var sku = worksheet.Cells[row, 5].Text;
@@ -166,14 +244,20 @@ namespace DealWithExcelFiles.Controllers
                                 // Skip rows with empty SKU (you can add more checks if needed)
                                 if (string.IsNullOrWhiteSpace(sku))
                                 {
+                                    if (countEmptyRows == 5)
+                                    {
+                                        break;
+                                    }
+
+                                    countEmptyRows++;
                                     continue;
+
                                 }
 
                                 var existingProduct = _dbContext.Products.FirstOrDefault(p => p.PartSKU == sku);
 
                                 if (existingProduct == null)
                                 {
-                                    // Insert new product if SKU doesn't exist
                                     var product = new Product
                                     {
                                         Band = int.Parse(worksheet.Cells[row, 2].Text),
@@ -186,11 +270,10 @@ namespace DealWithExcelFiles.Controllers
                                         DiscountedPrice = worksheet.Cells[row, 9].Text
                                     };
 
-                                    _dbContext.Products.Add(product);
+                                    batch.Add(product);
                                 }
                                 else
                                 {
-                                    // Update existing product if SKU exists
                                     existingProduct.Band = int.Parse(worksheet.Cells[row, 2].Text);
                                     existingProduct.CategoryCode = worksheet.Cells[row, 3].Text;
                                     existingProduct.Manufacturer = worksheet.Cells[row, 4].Text;
@@ -201,19 +284,125 @@ namespace DealWithExcelFiles.Controllers
 
                                     _dbContext.Products.Update(existingProduct);
                                 }
+
+                                if (batch.Count >= 500000) // Adjust the batch size as needed
+                                {
+                                    _dbContext.Products.AddRange(batch);
+                                    batch.Clear();
+                                    await _dbContext.SaveChangesAsync();
+
+                                    //var progress = (double)row / totalRowCount * 100;
+                                    //await SendProgressToClient(progress);
+
+                                    Thread.Sleep(1000);
+                                }
+
+
                             }
 
-                            await _dbContext.SaveChangesAsync();
+                            if (batch.Any())
+                            {
+                                _dbContext.Products.AddRange(batch);
+                                await _dbContext.SaveChangesAsync();
+                            }
                         }
                     }
                 }
-
+                //await SendProgressToClient(100.00);
                 return RedirectToAction("Success");
             }
 
-            return View(model);
+            return RedirectToAction("Index");
         }
 
+        //private async Task SendProgressToClient(double percentage)
+        //{
+        //    Response.Headers.Add("X-Progress", percentage.ToString("F2"));
+        //    await Response.Body.FlushAsync();
+        //}
+
+        //[HttpPost]
+        //public async Task<IActionResult> Upload(FileUploadViewModel model)
+        //{
+        //    if (ModelState.IsValid)
+        //    {
+        //        using (var memoryStream = new MemoryStream())
+        //        {
+        //            await model.ExcelFile.CopyToAsync(memoryStream);
+        //            using (var package = new ExcelPackage(memoryStream))
+        //            {
+        //                var worksheets = package.Workbook.Worksheets;
+
+        //                foreach (var worksheet in worksheets)
+        //                {
+        //                    var batch = new List<Product>();
+        //                    var existingProducts = new Dictionary<string, Product>();
+
+        //                    for (int row = 3; row <= worksheet.Dimension.End.Row; row++)
+        //                    {
+        //                        var sku = worksheet.Cells[row, 5].Text;
+
+        //                        if (string.IsNullOrWhiteSpace(sku))
+        //                        {
+        //                            continue;
+        //                        }
+
+        //                        if (!existingProducts.TryGetValue(sku, out var existingProduct))
+        //                        {
+        //                            existingProduct = _dbContext.Products.FirstOrDefault(p => p.PartSKU == sku);
+        //                            existingProducts[sku] = existingProduct;
+        //                        }
+
+        //                        var product = new Product
+        //                        {
+        //                            Band = int.Parse(worksheet.Cells[row, 2].Text),
+        //                            CategoryCode = worksheet.Cells[row, 3].Text,
+        //                            Manufacturer = worksheet.Cells[row, 4].Text,
+        //                            PartSKU = sku,
+        //                            ItemDescription = worksheet.Cells[row, 6].Text,
+        //                            ListPrice = worksheet.Cells[row, 7].Text,
+        //                            MinimumDiscount = worksheet.Cells[row, 8].Text,
+        //                            DiscountedPrice = worksheet.Cells[row, 9].Text
+        //                        };
+
+        //                        if (existingProduct == null)
+        //                        {
+        //                            batch.Add(product);
+        //                            existingProducts[sku] = product;
+        //                        }
+        //                        else
+        //                        {
+        //                            existingProduct.Band = product.Band;
+        //                            existingProduct.CategoryCode = product.CategoryCode;
+        //                            existingProduct.Manufacturer = product.Manufacturer;
+        //                            existingProduct.ItemDescription = product.ItemDescription;
+        //                            existingProduct.ListPrice = product.ListPrice;
+        //                            existingProduct.MinimumDiscount = product.MinimumDiscount;
+        //                            existingProduct.DiscountedPrice = product.DiscountedPrice;
+        //                        }
+
+        //                        if (batch.Count >= 500) // Adjust the batch size as needed
+        //                        {
+        //                            _dbContext.Products.AddRange(batch);
+        //                            await _dbContext.SaveChangesAsync();
+        //                            batch.Clear();
+        //                        }
+        //                    }
+
+        //                    if (batch.Any())
+        //                    {
+        //                        _dbContext.Products.AddRange(batch);
+        //                        await _dbContext.SaveChangesAsync();
+        //                    }
+        //                }
+        //            }
+        //        }
+
+        //        return RedirectToAction("Success");
+        //    }
+
+        //    return View(model);
+        //}
 
 
         [HttpGet]
